@@ -97,6 +97,7 @@ struct FrameFacts {
   uint32_t ngx_frame_generation = 0u;                        // live NGX FrameGeneration features (FeatureRegistry)
   bool nr_allowed = true;                                    // NrClaim lets this device load NR
   bool uplift_mv_lumenite = false;    // UPLIFT_MV holds Lumenite's vectors (Uplift.fx compiled with UPLIFT_USE_LUMENITE): the readouts name it
+  bool uplift_mv_dlss5 = false;       // local build: UPLIFT_MV holds DLSS5_Motion's vectors (UPLIFT_USE_DLSS5)
   bool present_motion_copy = false;   // A native Vulkan context copies DLSS's motion vectors for the Present path (set by the add-on only)
   bool vulkan = false;                // a Vulkan device's bridged context, whose motion line must not name Direct3D 12 or Launchpad (set by the add-on only)
   uint64_t upscaler_creates = 0u;     // the game's DLSS creates on this device so far (FeatureRegistry::UpscalerCreates; set by the add-on only)
@@ -120,9 +121,13 @@ struct FrameFacts {
 };
 
 // The name of what UPLIFT_MV holds, and why none arrived, for the motion readouts.
-inline std::string_view UpliftMvName(const FrameFacts& facts) { return (facts.uplift_mv_lumenite ? "Lumenite" : "Launchpad"); }
+inline std::string_view UpliftMvName(const FrameFacts& facts) {
+  return (facts.uplift_mv_dlss5 ? "DLSS5 Feeder" : facts.uplift_mv_lumenite ? "Lumenite" : "Launchpad");
+}
 inline std::string_view NoUpliftMvReason(const FrameFacts& facts) {
-  return (facts.uplift_mv_lumenite ? "no UPLIFT_MV this frame (Uplift.fx below Lumenite's Kernel)" : "no UPLIFT_MV this frame (Uplift.fx below Launchpad)");
+  return (facts.uplift_mv_dlss5      ? "no UPLIFT_MV this frame (Uplift.fx below DLSS5_Motion)"
+          : facts.uplift_mv_lumenite ? "no UPLIFT_MV this frame (Uplift.fx below Lumenite's Kernel)"
+                                     : "no UPLIFT_MV this frame (Uplift.fx below Launchpad)");
 }
 
 // FrameSettings::look from `settings`, with passes 2..10's `later_controls` (ControlsCoalescer::LaterPasses);
@@ -147,6 +152,7 @@ struct FrameFactsInputs {
   uint32_t ngx_frame_generation = 0u;
   bool nr_allowed = true;
   bool uplift_mv_lumenite = false;  // Uplift.fx writes Lumenite's vectors into UPLIFT_MV (the host's link knows)
+  bool uplift_mv_dlss5 = false;     // the same for DLSS5_Motion's
 };
 [[nodiscard]] FrameFacts BuildFrameFacts(const ui::Settings& settings, const FrameFactsInputs& inputs);
 // The game-facing present the helper records for Before FG: it is game-facing and BEFORE_READY, effects are off, and Before FG's outer motion

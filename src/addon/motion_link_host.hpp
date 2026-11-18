@@ -18,6 +18,7 @@ namespace uplift::addon {
 // LaunchpadReadiness; ChooseUpliftMvSources picks at most one. Header-only: the ReShade calls are the hosts' own.
 inline constexpr char LAUNCHPAD_DEFINE[] = "UPLIFT_USE_LAUNCHPAD";
 inline constexpr char LUMENITE_DEFINE[] = "UPLIFT_USE_LUMENITE";
+inline constexpr char DLSS5_DEFINE[] = "UPLIFT_USE_DLSS5";  // local build
 
 struct MotionLinks {
   EarlyMarker early;
@@ -25,8 +26,10 @@ struct MotionLinks {
   UpliftMvSource last_source = UpliftMvSource::NONE;
   LaunchPadLink launchpad;
   LaunchPadLink lumenite;
+  LaunchPadLink dlss5;
   LaunchpadReadiness launchpad_readiness;  // Setup's "ready", held through the effect reload a link itself causes
   LaunchpadReadiness lumenite_readiness;
+  LaunchpadReadiness dlss5_readiness;
   // A new runtime, or its reinit: everything decides afresh.
   void Reset() { *this = {}; }
   // The early window and its provider decide afresh: an effect reload, and part of a new preset's ResetLinks.
@@ -39,6 +42,7 @@ struct MotionLinks {
     ResetEarly();
     launchpad.Reset();
     lumenite.Reset();
+    dlss5.Reset();
   }
 };
 
@@ -58,6 +62,8 @@ struct MotionLinkStep {
   bool launchpad_ready = false;     // MartysMods_Launchpad and the Uplift technique are enabled (held through a reload)
   bool lumenite_ready = false;      // Lumenite_Kernel and the Uplift technique are enabled (held through a reload)
   bool uplift_mv_lumenite = false;  // Uplift.fx is (or is about to be) compiled with Lumenite's pass: UPLIFT_MV holds Lumenite's vectors
+  bool dlss5_ready = false;         // DLSS5_Motion and the Uplift technique are enabled (held through a reload)
+  bool uplift_mv_dlss5 = false;     // Uplift.fx is (or is about to be) compiled with the DLSS5 pass
   // 1.2.1: the source Uplift.fx is (or is about to be) compiled with; the readers take UPLIFT_MV only while its technique is on (UpliftMvValid).
   UpliftMvSource compiled = UpliftMvSource::NONE;
 };
@@ -86,7 +92,8 @@ inline Definition Read(reshade::api::effect_runtime* runtime, const char* define
 // `uplift`: the Uplift technique as found (0 while effects load); `marker`: it is enabled. `launchpad_here` / `lumenite_here`: the device's API can use
 // that source (LAUNCHPAD_ON_D3D9, LUMENITE_ON_D3D9). Every set is logged (LaunchPadLinkLine, LumeniteLinkLine) and recompiles Uplift.fx.
 inline MotionLinkStep UpdateMotionLinks(MotionLinks* links, reshade::api::effect_runtime* runtime, reshade::api::effect_technique uplift, bool marker,
-                                        ui::MotionVectorSource setting, bool launchpad_here, bool lumenite_here, std::chrono::steady_clock::time_point now) {
+                                        ui::MotionVectorSource setting, bool launchpad_here, bool lumenite_here, std::chrono::steady_clock::time_point now,
+                                        bool dlss5_here = false) {
   namespace api = reshade::api;
   MotionLinkStep step;
   // Ready only once ReShade has finished loading: find_technique and enumerate_techniques find nothing while it loads (reshade-main runtime_api.cpp),
@@ -110,8 +117,9 @@ inline MotionLinkStep UpdateMotionLinks(MotionLinks* links, reshade::api::effect
   };
   const motion_link_detail::Definition launchpad_define = motion_link_detail::Read(runtime, LAUNCHPAD_DEFINE, checkboxes && shader_source == 1);
   const motion_link_detail::Definition lumenite_define = motion_link_detail::Read(runtime, LUMENITE_DEFINE, checkboxes && shader_source == 2);
+  const motion_link_detail::Definition dlss5_define = motion_link_detail::Read(runtime, DLSS5_DEFINE, checkboxes && shader_source == 3);
   // An Uplift.fx that failed to compile with "1" lists no technique. Its own entry for either define still means ReShade knows it, so "0" can go back.
-  if (!ready && (launchpad_define.effect_scope || lumenite_define.effect_scope)) {
+  if (!ready && (launchpad_define.effect_scope || lumenite_define.effect_scope || dlss5_define.effect_scope)) {
     runtime->enumerate_techniques(nullptr, [&ready](api::effect_runtime*, api::effect_technique) {
       ready = true;  // not loading
     });
@@ -120,13 +128,17 @@ inline MotionLinkStep UpdateMotionLinks(MotionLinks* links, reshade::api::effect
   const api::effect_technique lumenite_technique = (lumenite_here ? runtime->find_technique(nullptr, LUMENITE_TECHNIQUE) : api::effect_technique{0u});
   const bool launchpad_on = (launchpad_technique.handle != 0u && runtime->get_technique_state(launchpad_technique) && allowed("UpliftAllowLaunchpad"));
   const bool lumenite_on = (lumenite_technique.handle != 0u && runtime->get_technique_state(lumenite_technique) && allowed("UpliftAllowLumenite"));
+  const api::effect_technique dlss5_technique = (dlss5_here ? runtime->find_technique(nullptr, DLSS5_TECHNIQUE) : api::effect_technique{0u});
+  const bool dlss5_on = (dlss5_technique.handle != 0u && runtime->get_technique_state(dlss5_technique) && allowed("UpliftAllowDlss5"));
   // Setup offers a source only while its technique and the Uplift technique are both enabled (the Uplift technique's own order shows only at run
   // time). ReShade lists no technique while it reloads Uplift.fx, which choosing a source does: the last ready value holds through that.
   step.launchpad_ready = links->launchpad_readiness.Update((uplift.handle != 0u && launchpad_technique.handle != 0u), (marker && launchpad_on), now);
   step.lumenite_ready = links->lumenite_readiness.Update((uplift.handle != 0u && lumenite_technique.handle != 0u), (marker && lumenite_on), now);
-  const UpliftMvSources wanted = ChooseUpliftMvSources(setting, launchpad_on, lumenite_on);
+  step.dlss5_ready = links->dlss5_readiness.Update((uplift.handle != 0u && dlss5_technique.handle != 0u), (marker && dlss5_on), now);
+  const UpliftMvSources wanted = ChooseUpliftMvSources(setting, launchpad_on, lumenite_on, dlss5_on);
   bool launchpad_now = launchpad_define.current.value_or(false);
   bool lumenite_now = lumenite_define.current.value_or(false);
+  bool dlss5_now = dlss5_define.current.value_or(false);
   if (launchpad_here) {
     if (const std::optional<bool> link = links->launchpad.Update({.ready = ready, .wanted = wanted.launchpad, .current = launchpad_define.current})) {
       nr::Log(nr::LogLevel::INFO, LaunchPadLinkLine(*link));
@@ -141,22 +153,32 @@ inline MotionLinkStep UpdateMotionLinks(MotionLinks* links, reshade::api::effect
       lumenite_now = *link;
     }
   }
+  if (dlss5_here) {
+    if (const std::optional<bool> link = links->dlss5.Update({.ready = ready, .wanted = wanted.dlss5, .current = dlss5_define.current})) {
+      nr::Log(nr::LogLevel::INFO, Dlss5LinkLine(*link));
+      runtime->set_preprocessor_definition_for_effect(uplift::text::UPLIFT_FX_EFFECT, DLSS5_DEFINE, (*link ? "1" : "0"));
+      dlss5_now = *link;
+    }
+  }
   // Uplift.fx compiles Launchpad's pass when both are set (its #if order), so UPLIFT_MV is Lumenite's only without Launchpad's.
   if (checkboxes) {
-    step.compiled = CompiledUpliftMv(wanted.launchpad, shader_source == 1, wanted.lumenite, shader_source == 2);
+    step.compiled = CompiledUpliftMv(wanted.launchpad, shader_source == 1, wanted.lumenite, shader_source == 2, wanted.dlss5, shader_source == 3);
   } else {
-    step.compiled = CompiledUpliftMv(launchpad_here, launchpad_now, lumenite_here, lumenite_now);
+    step.compiled = CompiledUpliftMv(launchpad_here, launchpad_now, lumenite_here, lumenite_now, dlss5_here, dlss5_now);
   }
-  if (!marker || !ready || !UpliftMvValid(step.compiled, wanted.launchpad, wanted.lumenite)) step.compiled = UpliftMvSource::NONE;
+  if (!marker || !ready || !UpliftMvValid(step.compiled, wanted.launchpad, wanted.lumenite, wanted.dlss5)) step.compiled = UpliftMvSource::NONE;
   links->provider = {};
   if (step.compiled == UpliftMvSource::LAUNCHPAD) links->provider = launchpad_technique;
   if (step.compiled == UpliftMvSource::LUMENITE) links->provider = lumenite_technique;
+  if (step.compiled == UpliftMvSource::DLSS5) links->provider = dlss5_technique;
   if (step.compiled != links->last_source) {
     links->last_source = step.compiled;
-    const char* source = step.compiled == UpliftMvSource::LAUNCHPAD ? "Launchpad" : step.compiled == UpliftMvSource::LUMENITE ? "Lumenite" : "Off";
+    const char* source = step.compiled == UpliftMvSource::LAUNCHPAD ? "Launchpad" : step.compiled == UpliftMvSource::LUMENITE ? "Lumenite"
+                         : step.compiled == UpliftMvSource::DLSS5 ? "DLSS5 Feeder (DLSS5_Motion)" : "Off";
     nr::Logf(nr::LogLevel::INFO, "Uplift.fx motion source: {}", source);
   }
   step.uplift_mv_lumenite = (step.compiled == UpliftMvSource::LUMENITE);
+  step.uplift_mv_dlss5 = (step.compiled == UpliftMvSource::DLSS5);
   return step;
 }
 

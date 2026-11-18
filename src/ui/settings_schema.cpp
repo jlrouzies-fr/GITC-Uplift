@@ -15,7 +15,7 @@ constexpr std::array<std::string_view, 3> MODELS = {"Style A", "Style B", "Style
 constexpr std::array<std::string_view, 3> NR_NETWORKS = {"Default", "A: Legacy", "B: Small FP8"};
 constexpr std::array<std::string_view, 3> PASS_NETWORKS = {"Same as pass 1", "A: Legacy", "B: Small FP8"};
 constexpr std::array<std::string_view, 3> SOURCES = {"Auto", "After DLSS", "Present"};
-constexpr std::array<std::string_view, 5> MOTION_VECTORS = {"Auto", "DLSS", "Launchpad", "None", "Lumenite"};  // stored-index order (Setup shows Lumenite after Launchpad)
+constexpr std::array<std::string_view, 6> MOTION_VECTORS = {"Auto", "DLSS", "Launchpad", "None", "Lumenite", "DLSS5 Feeder"};  // stored-index order (Setup shows Lumenite after Launchpad)
 constexpr std::array<std::string_view, 7> QUALITY_MODES = {"Game", "Performance", "Balanced", "Quality",
                                                            "Ultra Performance", "Ultra Quality", "DLAA"};
 constexpr std::array<std::string_view, 5> PRESETS = {"Game", "J", "K", "L", "M"};
@@ -126,7 +126,8 @@ bool KeepFacesOrFillOff(const Settings& s) {
 // The Before frame generation motion choice is shown only while that placement is on and the motion is Launchpad's or Lumenite's.
 bool BeforeFGMotionUnused(const Settings& s) {
   return (s.fg_present != Settings::FgPresent::BEFORE
-          || (s.motion_vectors != MotionVectorSource::LAUNCHPAD && s.motion_vectors != MotionVectorSource::LUMENITE));
+          || (s.motion_vectors != MotionVectorSource::LAUNCHPAD && s.motion_vectors != MotionVectorSource::LUMENITE
+              && s.motion_vectors != MotionVectorSource::DLSS5));
 }
 
 constexpr std::string_view PRESET_TOOLTIP =

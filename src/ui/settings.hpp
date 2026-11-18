@@ -49,6 +49,7 @@ enum class MotionVectorSource : uint32_t {
   LAUNCHPAD = 2u,
   NONE = 3u,
   LUMENITE = 4u,  // LumeniteFX's Kernel flow, through Uplift.fx's UPLIFT_MV as Launchpad's (stored last, shown after Launchpad)
+  DLSS5 = 5u,     // local build: DLSS 5 Feeder's DLSS5_Motion.fx (DLSS5_MotionVectors), through UPLIFT_MV as Launchpad's; never chosen by Auto
 };
 
 // The Source toggle the overlay draws, in pipeline order. `SourcePickOf`/`SetSourcePick`
@@ -73,6 +74,7 @@ enum class MotionPick : uint32_t {
   DLSS,
   LAUNCHPAD,
   LUMENITE,
+  DLSS5,
 };
 
 // The stored index is NVSDK_NGX_PerfQuality_Value + 1; GAME keeps the game's own mode.

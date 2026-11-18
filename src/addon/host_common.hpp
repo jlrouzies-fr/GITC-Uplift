@@ -246,14 +246,15 @@ std::optional<MotionLinkStep> LinkMotion(Entry& entry, ui::MotionVectorSource mo
   }
   const bool launchpad_here = (!d3d9 || LAUNCHPAD_ON_D3D9);
   const bool lumenite_here = (!d3d9 || LUMENITE_ON_D3D9);
-  if (!launchpad_here && !lumenite_here) return std::nullopt;
+  const bool dlss5_here = (!d3d9 || DLSS5_ON_D3D9);
+  if (!launchpad_here && !lumenite_here && !dlss5_here) return std::nullopt;
   if (entry.link_runtime != entry.runtime) {
     entry.motion_links.Reset();
     entry.link_runtime = entry.runtime;
     entry.link_preset_path.clear();
   }
   return UpdateMotionLinks(&entry.motion_links, entry.runtime, technique, (entry.marker != NO_TECHNIQUE), motion_vectors, launchpad_here,
-                           lumenite_here, now);
+                           lumenite_here, now, dlss5_here);
 }
 
 // Setup's Launchpad and Lumenite readiness and Uplift.fx's compiled source from one present's link step, into a device record (the 64-bit
@@ -263,6 +264,8 @@ void NoteMotionLinkStep(const MotionLinkStep& step, Target* target) {
   target->launchpad_ready = step.launchpad_ready;
   target->lumenite_ready = step.lumenite_ready;
   target->uplift_mv_lumenite = step.uplift_mv_lumenite;
+  target->dlss5_ready = step.dlss5_ready;
+  target->uplift_mv_dlss5 = step.uplift_mv_dlss5;
   target->uplift_mv_source = step.compiled;
 }
 

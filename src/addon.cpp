@@ -187,6 +187,8 @@ struct DeviceEntry {
   bool launchpad_ready = false;
   bool lumenite_ready = false;      // the same for Lumenite's Kernel (Setup's Lumenite option)
   bool uplift_mv_lumenite = false;  // Uplift.fx writes Lumenite's vectors into UPLIFT_MV (the links' state; the readouts name it)
+  bool dlss5_ready = false;         // the same for DLSS5_Motion (Setup's DLSS5 Feeder option)
+  bool uplift_mv_dlss5 = false;     // Uplift.fx writes DLSS5_Motion's vectors into UPLIFT_MV
   addon::UpliftMvSource uplift_mv_source = addon::UpliftMvSource::NONE;  // 1.2.1: the source Uplift.fx is compiled with (MotionLinkStep::compiled)
   std::string mask_note;  // the overlay's "NR mask" line
   // The device's API: d3d11, d3d10, vulkan and opengl are set together at every present, from the device's first one on.
@@ -2264,7 +2266,7 @@ void VkDeviceRouter::DecidePresentMotion() {
       (native_route ? (entry.vk_dlss ? entry.vk_dlss->NrState() : nr::SessionState::OFF) : (entry.context ? entry.context->NrState() : nr::SessionState::OFF));
   const bool outer_motion_route = addon::BeforeFgOuterMotionCandidate(before_fg_facts);
   replace_late_motion = outer_motion_route && (state.settings.motion_vectors == ui::MotionVectorSource::LAUNCHPAD
-      || state.settings.motion_vectors == ui::MotionVectorSource::LUMENITE);
+      || state.settings.motion_vectors == ui::MotionVectorSource::LUMENITE || state.settings.motion_vectors == ui::MotionVectorSource::DLSS5);
   present_motion_wanted = addon::PresentMotionWanted({
       .enabled = state.settings.enabled,
       .nr_state = present_state,
@@ -2370,7 +2372,8 @@ bool VkDeviceRouter::RunNativeContext() {
       &state.coalescer, now);
   addon::FrameFacts native_facts = addon::BuildFrameFacts(
       state.settings,
-      {.ngx_frame_generation = addon::BeforeFgConfigCount(before_fg_facts), .nr_allowed = native_allowed, .uplift_mv_lumenite = entry.uplift_mv_lumenite});
+      {.ngx_frame_generation = addon::BeforeFgConfigCount(before_fg_facts), .nr_allowed = native_allowed, .uplift_mv_lumenite = entry.uplift_mv_lumenite,
+       .uplift_mv_dlss5 = entry.uplift_mv_dlss5});
   native_facts.present_motion_copy = present_motion_wanted;
   if (replace_late_motion) {
     native_facts.motion_at_dlss_stage = native_settings.motion_vectors;
@@ -2603,8 +2606,10 @@ void OnPresent(api::command_queue* queue, api::swapchain* swapchain, const api::
     }
     entry.launchpad_ready = false;
     entry.lumenite_ready = false;
+    entry.dlss5_ready = false;
     entry.helper.launchpad_ready = false;
     entry.helper.lumenite_ready = false;
+    entry.helper.dlss5_ready = false;
     if (const std::optional<addon::MotionLinkStep> step = addon::host::LinkMotion(entry, state.settings.motion_vectors, d3d9, now)) {
       addon::host::NoteMotionLinkStep(*step, &entry);
       addon::host::NoteMotionLinkStep(*step, &entry.helper);
@@ -2916,7 +2921,8 @@ void OnPresent(api::command_queue* queue, api::swapchain* swapchain, const api::
         {.settings = &settings, .drag = state.overlay.drag, .defaults_view = state.overlay.defaults_view, .settings_generation = state.settings_generation},
         &state.coalescer, now);
     addon::FrameFacts frame_facts = addon::BuildFrameFacts(
-        settings, {.ngx_frame_generation = addon::BeforeFgConfigCount(before_fg_facts), .nr_allowed = nr_allowed, .uplift_mv_lumenite = entry.uplift_mv_lumenite});
+        settings, {.ngx_frame_generation = addon::BeforeFgConfigCount(before_fg_facts), .nr_allowed = nr_allowed, .uplift_mv_lumenite = entry.uplift_mv_lumenite,
+                   .uplift_mv_dlss5 = entry.uplift_mv_dlss5});
     if (entry.vk_bridge) {
       frame_settings.source = addon::VkPresentSource(frame_settings.source);
     }
@@ -3110,9 +3116,11 @@ void OnRenderTechnique(api::effect_runtime* runtime, api::effect_technique techn
       // then holds the compiled source's last vectors, frozen (a reload that re-applied a preset).
       const api::effect_technique launchpad_technique = runtime->find_technique(nullptr, addon::LAUNCHPAD_TECHNIQUE);
       const api::effect_technique lumenite_technique = runtime->find_technique(nullptr, addon::LUMENITE_TECHNIQUE);
+      const api::effect_technique dlss5_technique = runtime->find_technique(nullptr, addon::DLSS5_TECHNIQUE);
       const bool source_on = addon::UpliftMvValid(entry->uplift_mv_source,
                                                   (launchpad_technique.handle != 0u && runtime->get_technique_state(launchpad_technique)),
-                                                  (lumenite_technique.handle != 0u && runtime->get_technique_state(lumenite_technique)));
+                                                  (lumenite_technique.handle != 0u && runtime->get_technique_state(lumenite_technique)),
+                                                  (dlss5_technique.handle != 0u && runtime->get_technique_state(dlss5_technique)));
       const api::effect_texture_variable motion = runtime->find_texture_variable(nullptr, uplift::text::UPLIFT_MOTION_TEXTURE);
       if (source_on && motion.handle != 0u) {
         api::resource_view view_srgb = {0u};
@@ -3475,10 +3483,12 @@ void OnDrawOverlay(api::effect_runtime* runtime) {
       facts.before_fg_late_effects = state.settings.fg_present == ui::Settings::FgPresent::BEFORE && !entry.before_fg.early_confirmed && entry.before_fg.note.id != BeforeFgNote::NONE;
       facts.launchpad_ready = entry.launchpad_ready;
       facts.lumenite_ready = entry.lumenite_ready;
+      facts.dlss5_ready = entry.dlss5_ready;
       // Split chain: as FrameFacts::split_capable, the native Vulkan context's included.
       facts.split_capable = addon::SplitCapable(Bridged(entry), entry.d3d11,
                                                 (entry.vulkan && native_view && state.settings.vulkan_nr == ui::VulkanNrMode::NATIVE && entry.vk_stages_off.empty()));
       facts.uplift_mv_lumenite = entry.uplift_mv_lumenite;
+      facts.uplift_mv_dlss5 = entry.uplift_mv_dlss5;
       facts.match_game_readable = (!Bridged(entry) || entry.d3d11 || native_view);  // the bridges never see the game's DLSS create (Direct3D 11's context reads it)
       // At Present on Vulkan a DLSS stage reads it when it can run here, so Match game waits for one (temporary).
       facts.match_game_at_dlss_stages = (entry.vulkan && !native_view && view.dlss_unavailable.empty());
@@ -3547,6 +3557,7 @@ void OnDrawOverlay(api::effect_runtime* runtime) {
         if (Bridged(entry) && !entry.vulkan) view.details_backend = std::format("{} (Direct3D 12 bridge)", facts.api);
         view.details_note = status.chain_note;
         view.lumenite_motion = entry.uplift_mv_lumenite;
+        view.dlss5_motion = entry.uplift_mv_dlss5;
         // Split chain: the chain's groups while it is split, and why a stored "Runs at" does not run as stored (the working card's note too).
         chain_note = status.chain_note;
         facts.chain_note = chain_note;

@@ -12,6 +12,11 @@ namespace uplift::addon {
 // Technique identifiers supplied by the external motion effects.
 inline constexpr char LAUNCHPAD_TECHNIQUE[] = "MartysMods_Launchpad";
 inline constexpr char LUMENITE_TECHNIQUE[] = "Lumenite_Kernel";
+// Local build: DLSS 5 Feeder's DLSS5_Motion.fx (technique DLSS5_Motion, texture DLSS5_MotionVectors: delta UV, this frame to the previous one).
+inline constexpr char DLSS5_TECHNIQUE[] = "DLSS5_Motion";
+// As Lumenite's: Uplift.fx compiles its DLSS5 pass from Direct3D 10 on only (DLSS5_Motion.fx needs Direct3D 10 too).
+inline constexpr bool DLSS5_ON_D3D9 = false;
+inline constexpr std::string_view DLSS5_D3D9_REASON = "DLSS5 Feeder's vectors are not used on Direct3D 9";
 
 // The ONE switch for LaunchPad on Direct3D 9. On: both hosts' link blocks include D3D9 devices (Uplift sets UPLIFT_USE_LAUNCHPAD for
 // them), HelperFront::Technique passes UPLIFT_MV to NR, and the motion readout is the helper's. Off: no D3D9 link, no D3D9 motion copy,
@@ -34,8 +39,9 @@ inline constexpr std::string_view LUMENITE_D3D9_REASON = "Lumenite's vectors are
 struct UpliftMvSources {
   bool launchpad = false;
   bool lumenite = false;
+  bool dlss5 = false;  // local build: only by an explicit choice, never Auto
 };
-[[nodiscard]] UpliftMvSources ChooseUpliftMvSources(ui::MotionVectorSource setting, bool launchpad_on, bool lumenite_on);
+[[nodiscard]] UpliftMvSources ChooseUpliftMvSources(ui::MotionVectorSource setting, bool launchpad_on, bool lumenite_on, bool dlss5_on = false);
 // MotionVectors can use UPLIFT_MV at all (Auto, Launchpad, Lumenite): only then is it copied for NR (a 32 MiB copy at 4K otherwise). Pure.
 [[nodiscard]] bool MotionUsesUpliftMv(ui::MotionVectorSource setting);
 
@@ -45,13 +51,15 @@ enum class UpliftMvSource : uint8_t {
   NONE,
   LAUNCHPAD,
   LUMENITE,
+  DLSS5,
 };
 // From the two defines as they stand (`*_now`: the value a link set this frame, else the definition read, false where unknown) and whether the device can
 // use each source; Uplift.fx's own #if order: LaunchPad's pass wins when both are set. Pure.
-[[nodiscard]] UpliftMvSource CompiledUpliftMv(bool launchpad_here, bool launchpad_now, bool lumenite_here, bool lumenite_now);
+[[nodiscard]] UpliftMvSource CompiledUpliftMv(bool launchpad_here, bool launchpad_now, bool lumenite_here, bool lumenite_now, bool dlss5_here = false,
+                                              bool dlss5_now = false);
 // UPLIFT_MV holds this frame's vectors only while the technique of the source Uplift.fx is compiled with is on; otherwise the readers treat it as no
 // UPLIFT_MV this frame. `launchpad_on` / `lumenite_on`: MartysMods_Launchpad / Lumenite_Kernel is enabled. Pure.
-[[nodiscard]] bool UpliftMvValid(UpliftMvSource compiled, bool launchpad_on, bool lumenite_on);
+[[nodiscard]] bool UpliftMvValid(UpliftMvSource compiled, bool launchpad_on, bool lumenite_on, bool dlss5_on = false);
 
 // What the link reads at a present.
 struct LaunchPadLinkFrame {
@@ -91,6 +99,8 @@ class LaunchPadLink {
 [[nodiscard]] std::string LaunchPadLinkLine(bool value);
 // The same for UPLIFT_USE_LUMENITE: "Lumenite link: UPLIFT_USE_LUMENITE = 1; ...".
 [[nodiscard]] std::string LumeniteLinkLine(bool value);
+// The same for UPLIFT_USE_DLSS5.
+[[nodiscard]] std::string Dlss5LinkLine(bool value);
 
 // The UPLIFT_USE_LAUNCHPAD that Uplift.fx compiles with. ReShade takes the effect scope's definition first, then the
 // preset's, then the global one. `effect_value` is the effect scope's (get_preprocessor_definition_for_effect using UPLIFT_FX_EFFECT, which reads that scope only),

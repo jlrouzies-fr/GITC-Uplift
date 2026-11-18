@@ -96,6 +96,8 @@ struct HelperDevice {
   bool launchpad_ready = false;
   bool lumenite_ready = false;      // the same for Lumenite's Kernel (Setup's Lumenite option)
   bool uplift_mv_lumenite = false;  // Uplift.fx writes Lumenite's vectors into UPLIFT_MV; the FRAME tells the helper, for its readouts
+  bool dlss5_ready = false;         // local build: the same for DLSS5_Motion (the helper's own readouts still say Launchpad: no wire change)
+  bool uplift_mv_dlss5 = false;
   UpliftMvSource uplift_mv_source = UpliftMvSource::NONE;  // 1.2.1: the source Uplift.fx is compiled with; Technique takes UPLIFT_MV only while it is on
   // Why a 64-bit Vulkan device's NR at Present runs in the helper (addon::VkRouteChoice's reason; gitc-uplift.addon64 sets it at each present). The
   // Details line and the footer name the route with it. Empty in gitc-uplift.addon32 and for every other API.

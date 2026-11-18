@@ -101,13 +101,26 @@ SetupView ResolveSetup(const SetupFacts& facts) {
   } else if (!facts.lumenite_ready) {
     lumenite = {.why = "Enable Lumenite Kernel above Uplift and allow Lumenite motion in Uplift.fx.", .temporary = true};
   }
+  // DLSS 5 Feeder (DLSS5_Motion), as Lumenite.
+  OptionState& dlss5 = at(view.motion_options, MotionPick::DLSS5);
+  if (!facts.dlss5_fixed.empty()) {
+    dlss5 = {.why = facts.dlss5_fixed};
+  } else if (view.stage != SourcePick::PRESENT && !facts.present_fixed.empty()) {
+    dlss5 = {.why = facts.present_fixed};
+  } else if (view.stage != SourcePick::PRESENT) {
+    dlss5 = {.why = "DLSS5 Feeder feeds NR on the presented image only", .temporary = true};
+  } else if (!facts.dlss5_ready) {
+    dlss5 = {.why = "Enable DLSS5_Motion above Uplift and allow DLSS5 Feeder motion in Uplift.fx.", .temporary = true};
+  }
   if (facts.before_fg_late_effects) {
     launchpad = {.why = "Launchpad runs after frame generation", .temporary = true};
     lumenite = {.why = "Lumenite runs after frame generation", .temporary = true};
+    dlss5 = {.why = "DLSS5 Feeder runs after frame generation", .temporary = true};
   }
   hold(&dlss);
   hold(&launchpad);
   hold(&lumenite);
+  hold(&dlss5);
   const OptionState motion_wish = at(view.motion_options, facts.preferred_motion);
   MotionPick resolved_motion = MotionPick::OFF;
   if (selectable(motion_wish)) {
@@ -116,7 +129,8 @@ SetupView ResolveSetup(const SetupFacts& facts) {
     resolved_motion = MotionPick::LAUNCHPAD;
   } else if (facts.motion_auto && selectable(lumenite)) {
     resolved_motion = MotionPick::LUMENITE;  // Auto's order: DLSS, Launchpad, Lumenite
-  } else if ((facts.preferred_motion == MotionPick::LAUNCHPAD || facts.preferred_motion == MotionPick::LUMENITE) && view.stage != SourcePick::PRESENT
+  } else if ((facts.preferred_motion == MotionPick::LAUNCHPAD || facts.preferred_motion == MotionPick::LUMENITE || facts.preferred_motion == MotionPick::DLSS5)
+             && view.stage != SourcePick::PRESENT
              && selectable(dlss)) {
     resolved_motion = MotionPick::DLSS;  // inside the game's frame a Launchpad or Lumenite preference runs on the game's own vectors (the engine's rule)
   }
@@ -273,6 +287,15 @@ SetupView ResolveSetup(const SetupFacts& facts) {
       add("no UPLIFT_MV arrives: put Uplift.fx's Uplift technique below Lumenite's Kernel.");
     }
   }
+  if (facts.preferred_motion == MotionPick::DLSS5 && view.motion != MotionPick::DLSS5) {
+    if (motion_wish.temporary && view.stage != SourcePick::PRESENT) {
+      add("DLSS5 Feeder's vectors return when NR runs at Present; inside the game's frame NR uses the game's own.");
+    } else if (motion_wish.temporary) {
+      add("DLSS5 Feeder's vectors return when DLSS5_Motion and Uplift.fx's Uplift technique are on.");
+    } else if (selectable(motion_wish) && facts.launchpad_gap == MotionGap::NO_UPLIFT_MV) {
+      add("no UPLIFT_MV arrives: put Uplift.fx's Uplift technique below DLSS5_Motion.");
+    }
+  }
   if (view.resolution != facts.preferred_resolution && facts.preferred_resolution == ResolutionMode::MATCH_GAME
       && (selectable(resolution_wish) || resolution_wish.why == DLSS_NOT_SEEN_REASON)) {
     add("Match game applies when the game renders with DLSS.");
@@ -294,6 +317,7 @@ LiveCard BuildLiveCard(const SetupFacts& facts, const SetupView& shown) {
     case MotionPick::DLSS:      card.motion = (facts.motion_copied ? "DLSS (the game's, copied for Present)" : "DLSS (the game's)"); break;
     case MotionPick::LAUNCHPAD: card.motion = "Launchpad"; break;
     case MotionPick::LUMENITE:  card.motion = "Lumenite"; break;
+    case MotionPick::DLSS5:     card.motion = "DLSS5 Feeder"; break;
   }
   std::string mode;
   switch (shown.resolution) {
@@ -402,7 +426,7 @@ void SetupSettle::ClickedBest(SetupRow row, uint32_t index, const SetupView& opt
         const bool present = (!stage || *stage == static_cast<uint32_t>(SourcePick::PRESENT));
         const bool launchpad = (motion_auto && present && runs(options.motion_options, MotionPick::LAUNCHPAD));
         const bool lumenite = (motion_auto && present && runs(options.motion_options, MotionPick::LUMENITE));  // Auto's order
-        best = static_cast<uint32_t>(launchpad ? MotionPick::LAUNCHPAD : lumenite ? MotionPick::LUMENITE : MotionPick::OFF);
+        best = static_cast<uint32_t>(launchpad ? MotionPick::LAUNCHPAD : lumenite ? MotionPick::LUMENITE : MotionPick::OFF);  // never DLSS5 (explicit only)
       }
       break;
     case SetupRow::RESOLUTION:

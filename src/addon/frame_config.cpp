@@ -57,10 +57,12 @@ FrameSettings BuildFrameSettings(const FrameSettingsInputs& inputs, ui::Controls
       // Launchpad and Lumenite feed the presented image only: inside the game's frame either runs on DLSS's own vectors.
       .motion_vectors = (settings.motion_vectors == ui::MotionVectorSource::AUTO
                          || settings.motion_vectors == ui::MotionVectorSource::DLSS
-                         || ((settings.motion_vectors == ui::MotionVectorSource::LAUNCHPAD || settings.motion_vectors == ui::MotionVectorSource::LUMENITE)
+                         || ((settings.motion_vectors == ui::MotionVectorSource::LAUNCHPAD || settings.motion_vectors == ui::MotionVectorSource::LUMENITE
+                              || settings.motion_vectors == ui::MotionVectorSource::DLSS5)
                              && settings.source != ui::PlacementSource::PRESENT)),
       .motion_vectors_want_launchpad = (settings.motion_vectors == ui::MotionVectorSource::LAUNCHPAD
-                                        || settings.motion_vectors == ui::MotionVectorSource::LUMENITE),
+                                        || settings.motion_vectors == ui::MotionVectorSource::LUMENITE
+                                        || settings.motion_vectors == ui::MotionVectorSource::DLSS5),
       .motion_scale_x = settings.motion_scale_x,
       .motion_scale_y = settings.motion_scale_y,
       .depth_inverted = (settings.depth_direction == ui::DepthDirection::GAME
@@ -76,7 +78,7 @@ FrameSettings BuildFrameSettings(const FrameSettingsInputs& inputs, ui::Controls
       .pre_upscale = settings.pre_upscale,
       .look = LookConfigFrom(look_settings, coalescer->LaterPasses(look_settings, inputs.drag.pass_slider, now)),
       .launchpad_motion = (settings.motion_vectors == ui::MotionVectorSource::AUTO || settings.motion_vectors == ui::MotionVectorSource::LAUNCHPAD
-                           || settings.motion_vectors == ui::MotionVectorSource::LUMENITE),
+                           || settings.motion_vectors == ui::MotionVectorSource::LUMENITE || settings.motion_vectors == ui::MotionVectorSource::DLSS5),
       .pass_view_limit = (inputs.defaults_view ? ui::DefaultSettings().pass_count : 0u),
       .settings_generation = inputs.settings_generation,
       // The later stage groups' own Resolution and "Keep faces here" (After DLSS, Present). `split_capable` is the add-on's.
@@ -101,6 +103,7 @@ FrameFacts BuildFrameFacts(const ui::Settings& settings, const FrameFactsInputs&
       .ngx_frame_generation = inputs.ngx_frame_generation,
       .nr_allowed = inputs.nr_allowed,
       .uplift_mv_lumenite = inputs.uplift_mv_lumenite,
+      .uplift_mv_dlss5 = inputs.uplift_mv_dlss5,
   };
 }
 

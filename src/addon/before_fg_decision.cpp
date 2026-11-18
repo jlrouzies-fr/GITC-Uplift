@@ -40,7 +40,7 @@ bool BeforeFgChecksOuterInputs(const BeforeFgInputs& inputs) {
 }
 
 OuterInputAction OuterMotionAction(ui::MotionVectorSource source, ui::Settings::FgMotion choice) {
-  if (source != ui::MotionVectorSource::LAUNCHPAD && source != ui::MotionVectorSource::LUMENITE)
+  if (source != ui::MotionVectorSource::LAUNCHPAD && source != ui::MotionVectorSource::LUMENITE && source != ui::MotionVectorSource::DLSS5)
     return OuterInputAction::DISABLE_EFFECT_MOTION;
   return choice == ui::Settings::FgMotion::DLSS ? OuterInputAction::USE_DLSS : OuterInputAction::USE_NONE;
 }
@@ -90,7 +90,8 @@ BeforeFgDecision DecideBeforeFg(const BeforeFgInputs& inputs) {
     issue = BeforeFgNote::MASK_UNAVAILABLE;
   } else {
     decision.inputs = OuterInputAction::DISABLE_EFFECT_MOTION;
-    if (inputs.motion_source == ui::MotionVectorSource::LAUNCHPAD || inputs.motion_source == ui::MotionVectorSource::LUMENITE) {
+    if (inputs.motion_source == ui::MotionVectorSource::LAUNCHPAD || inputs.motion_source == ui::MotionVectorSource::LUMENITE
+        || inputs.motion_source == ui::MotionVectorSource::DLSS5) {
       if (inputs.before_fg_motion == ui::Settings::FgMotion::SELECT) {
         issue = BeforeFgNote::MOTION_SELECTION_REQUIRED;
       } else {

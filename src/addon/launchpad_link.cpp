@@ -20,11 +20,12 @@ std::optional<bool> LaunchPadLink::Update(const LaunchPadLinkFrame& frame) {
   return frame.wanted;
 }
 
-UpliftMvSources ChooseUpliftMvSources(ui::MotionVectorSource setting, bool launchpad_on, bool lumenite_on) {
+UpliftMvSources ChooseUpliftMvSources(ui::MotionVectorSource setting, bool launchpad_on, bool lumenite_on, bool dlss5_on) {
   switch (setting) {
     case ui::MotionVectorSource::AUTO:      return {.launchpad = launchpad_on, .lumenite = (!launchpad_on && lumenite_on)};
     case ui::MotionVectorSource::LAUNCHPAD: return {.launchpad = launchpad_on};
     case ui::MotionVectorSource::LUMENITE:  return {.lumenite = lumenite_on};
+    case ui::MotionVectorSource::DLSS5:     return {.dlss5 = dlss5_on};
     case ui::MotionVectorSource::DLSS:
     case ui::MotionVectorSource::NONE:      break;
   }
@@ -32,22 +33,30 @@ UpliftMvSources ChooseUpliftMvSources(ui::MotionVectorSource setting, bool launc
 }
 
 bool MotionUsesUpliftMv(ui::MotionVectorSource setting) {
-  return setting == ui::MotionVectorSource::AUTO || setting == ui::MotionVectorSource::LAUNCHPAD || setting == ui::MotionVectorSource::LUMENITE;
+  return setting == ui::MotionVectorSource::AUTO || setting == ui::MotionVectorSource::LAUNCHPAD || setting == ui::MotionVectorSource::LUMENITE
+         || setting == ui::MotionVectorSource::DLSS5;
 }
 
-UpliftMvSource CompiledUpliftMv(bool launchpad_here, bool launchpad_now, bool lumenite_here, bool lumenite_now) {
+UpliftMvSource CompiledUpliftMv(bool launchpad_here, bool launchpad_now, bool lumenite_here, bool lumenite_now, bool dlss5_here, bool dlss5_now) {
   if (launchpad_here && launchpad_now) return UpliftMvSource::LAUNCHPAD;
   if (lumenite_here && lumenite_now) return UpliftMvSource::LUMENITE;
+  if (dlss5_here && dlss5_now) return UpliftMvSource::DLSS5;  // Uplift.fx's #if order: Launchpad, Lumenite, DLSS5
   return UpliftMvSource::NONE;
 }
 
-bool UpliftMvValid(UpliftMvSource compiled, bool launchpad_on, bool lumenite_on) {
+bool UpliftMvValid(UpliftMvSource compiled, bool launchpad_on, bool lumenite_on, bool dlss5_on) {
   switch (compiled) {
     case UpliftMvSource::LAUNCHPAD: return launchpad_on;
     case UpliftMvSource::LUMENITE:  return lumenite_on;
+    case UpliftMvSource::DLSS5:     return dlss5_on;
     case UpliftMvSource::NONE:      break;
   }
   return false;
+}
+
+std::string Dlss5LinkLine(bool value) {
+  return std::format("DLSS5 link: UPLIFT_USE_DLSS5 = {}; ReShade recompiles Uplift.fx, and other add-ons that keep ReShade handles across a "
+                     "recompile may be affected", (value ? 1 : 0));
 }
 
 std::string LumeniteLinkLine(bool value) {

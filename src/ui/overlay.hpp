@@ -28,6 +28,7 @@ struct OverlayView {
   nr::Size output_size;
   nr::Size first_stage_input, first_stage_canvas;
   bool lumenite_motion = false;
+  bool dlss5_motion = false;  // UPLIFT_MV holds DLSS5_Motion's vectors
   struct Activity { uint64_t real = 0, reshade = 0, passes = 0; };
   std::optional<Activity> activity;
   bool legacy_runtime = false;

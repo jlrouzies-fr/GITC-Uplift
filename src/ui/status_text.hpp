@@ -116,6 +116,9 @@ struct SetupFacts {
   bool lumenite_ready = false;         // Lumenite's Kernel and Uplift.fx's Uplift technique are enabled
   std::string_view lumenite_fixed;     // Lumenite's vectors cannot reach NR on this device (Direct3D 9, or no images shared, as Launchpad's)
   bool uplift_mv_lumenite = false;     // UPLIFT_MV holds Lumenite's vectors now (the running provider reads as Lumenite, not Launchpad)
+  bool dlss5_ready = false;            // DLSS5_Motion's technique and Uplift.fx's Uplift technique are enabled
+  std::string_view dlss5_fixed;        // DLSS5_Motion's vectors cannot reach NR on this device (as Lumenite's)
+  bool uplift_mv_dlss5 = false;        // UPLIFT_MV holds DLSS5_Motion's vectors now
   bool match_game_readable = true;     // false on the bridges, OpenGL, the helper and Vulkan at Present
   bool match_game_at_dlss_stages = false;  // unreadable here, but a DLSS stage on this device reads it (Vulkan at Present)
   std::string_view below_full_fixed;   // why the modes below Full cannot run (fixed); current producers leave it empty
@@ -162,7 +165,7 @@ struct PassStageRow {
 
 struct SetupView {
   std::array<OptionState, 3> stage_options = {};       // SourcePick order
-  std::array<OptionState, 4> motion_options = {};      // MotionPick order
+  std::array<OptionState, 5> motion_options = {};      // MotionPick order
   std::array<OptionState, 6> resolution_options = {};  // ResolutionMode order
   SourcePick stage = SourcePick::PRESENT;              // the highlights: what runs
   MotionPick motion = MotionPick::OFF;

@@ -546,13 +546,16 @@ void HelperFront::Technique(HelperDevice& device, api::effect_runtime* runtime, 
   api::resource launchpad = {0u};
   const bool launchpad_here = (!device.d3d9 || LAUNCHPAD_ON_D3D9);
   const bool lumenite_here = (!device.d3d9 || LUMENITE_ON_D3D9);
-  if (device.SharesImages() && (launchpad_here || lumenite_here) && MotionUsesUpliftMv(settings.motion_vectors)) {
+  const bool dlss5_here = (!device.d3d9 || DLSS5_ON_D3D9);
+  if (device.SharesImages() && (launchpad_here || lumenite_here || dlss5_here) && MotionUsesUpliftMv(settings.motion_vectors)) {
     // 1.2.1: only while the technique of the source Uplift.fx is compiled with is on (UpliftMvValid); otherwise UPLIFT_MV holds that source's last
     // vectors, frozen, and this frame goes without.
     const api::effect_technique launchpad_technique = (launchpad_here ? runtime->find_technique(nullptr, LAUNCHPAD_TECHNIQUE) : api::effect_technique{0u});
     const api::effect_technique lumenite_technique = (lumenite_here ? runtime->find_technique(nullptr, LUMENITE_TECHNIQUE) : api::effect_technique{0u});
+    const api::effect_technique dlss5_technique = (dlss5_here ? runtime->find_technique(nullptr, DLSS5_TECHNIQUE) : api::effect_technique{0u});
     const bool source_on = UpliftMvValid(device.uplift_mv_source, (launchpad_technique.handle != 0u && runtime->get_technique_state(launchpad_technique)),
-                                         (lumenite_technique.handle != 0u && runtime->get_technique_state(lumenite_technique)));
+                                         (lumenite_technique.handle != 0u && runtime->get_technique_state(lumenite_technique)),
+                                         (dlss5_technique.handle != 0u && runtime->get_technique_state(dlss5_technique)));
     const api::effect_texture_variable motion = runtime->find_texture_variable(nullptr, uplift::text::UPLIFT_MOTION_TEXTURE);
     if (source_on && motion.handle != 0u) {
       api::resource_view view = {0u};
@@ -695,15 +698,22 @@ void HelperFront::Overlay(api::device* game_device, const HelperDevice* device, 
   facts.launchpad_ready = (device != nullptr && device->launchpad_ready);
   facts.lumenite_ready = (device != nullptr && device->lumenite_ready);
   facts.uplift_mv_lumenite = (device != nullptr && device->uplift_mv_lumenite);
+  facts.dlss5_ready = (device != nullptr && device->dlss5_ready);
+  facts.uplift_mv_dlss5 = (device != nullptr && device->uplift_mv_dlss5);
   if (device != nullptr && device->HasClient() && !device->SharesImages()) {
     // A Direct3D 10 or 11 device on the CPU-ordered fallback shares no images with the helper, so UPLIFT_MV never reaches NR (Technique skips it).
     facts.launchpad_fixed = (device->d3d10 ? "Launchpad's vectors are not available on this Direct3D 10 device (no fences)"
                                            : "Launchpad's vectors are not available on this Direct3D 11 device (no fences)");
     facts.lumenite_fixed = (device->d3d10 ? "Lumenite's vectors are not available on this Direct3D 10 device (no fences)"
                                           : "Lumenite's vectors are not available on this Direct3D 11 device (no fences)");
+    facts.dlss5_fixed = (device->d3d10 ? "DLSS5 Feeder's vectors are not available on this Direct3D 10 device (no fences)"
+                                       : "DLSS5 Feeder's vectors are not available on this Direct3D 11 device (no fences)");
   }
   if (d3d9 && !LUMENITE_ON_D3D9) {
     facts.lumenite_fixed = LUMENITE_D3D9_REASON;  // Uplift.fx's Lumenite pass is compiled from Direct3D 10 on
+  }
+  if (d3d9 && !DLSS5_ON_D3D9) {
+    facts.dlss5_fixed = DLSS5_D3D9_REASON;
   }
   std::string api_label = (addon_file_ == "gitc-uplift.addon32" ? std::format("{} (32-bit)", ApiName(device_api)) : std::string(ApiName(device_api)));
   if (device != nullptr && !device->route_reason.empty()) {
@@ -754,6 +764,7 @@ void HelperFront::Overlay(api::device* game_device, const HelperDevice* device, 
     view->output_size = {status->frame_width, status->frame_height};
     view->output_space = device->output_space;
     view->lumenite_motion = device->uplift_mv_lumenite;
+    view->dlss5_motion = device->uplift_mv_dlss5;
     view->legacy_runtime = status->legacy_runtime != 0u;
     view->ui_correction_note = std::string(ipc::TextOf(status->ui_correction_note));
     view->mask_note = device->mask_note;

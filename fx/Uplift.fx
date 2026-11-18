@@ -2,7 +2,7 @@
 // enable "Uplift" and drag it to where DLSS-NR should run: techniques above it see the game's
 // image, techniques below it see NR's output. Without it, Uplift runs NR before every effect.
 //
-// The two motion checkboxes permit the add-on to use a provider when its technique is enabled above Uplift.
+// The motion checkboxes permit the add-on to use a provider when its technique is enabled above Uplift.
 // Setup chooses the motion source. The add-on compiles the matching pass so unused provider textures and Launchpad's IPC request can be released.
 
 #ifndef UPLIFT_USE_LAUNCHPAD
@@ -11,6 +11,10 @@
 #ifndef UPLIFT_USE_LUMENITE
   #define UPLIFT_USE_LUMENITE 1
   #define UPLIFT_DETECT_KERNEL
+#endif
+// Local build: DLSS 5 Feeder's DLSS5_Motion. Off until Setup chooses "DLSS5 Feeder" (the add-on then sets it to 1).
+#ifndef UPLIFT_USE_DLSS5
+  #define UPLIFT_USE_DLSS5 0
 #endif
 
 #if __RENDERER__ >= 0x9000
@@ -25,6 +29,11 @@ uniform bool UpliftAllowLumenite <
   ui_type = "checkbox";
   ui_label = "Allow Lumenite motion";
   ui_tooltip = "Use Lumenite Kernel when selected in Uplift Setup. Enable its technique above Uplift.";
+> = true;
+uniform bool UpliftAllowDlss5 <
+  ui_type = "checkbox";
+  ui_label = "Allow DLSS5 Feeder motion";
+  ui_tooltip = "Use DLSS 5 Feeder's DLSS5_Motion when selected in Uplift Setup. Enable its technique above Uplift.";
 > = true;
 #endif
 
@@ -58,7 +67,14 @@ uniform bool UpliftAllowLumenite <
   #endif
 #endif
 
-#if UPLIFT_LAUNCHPAD || UPLIFT_LUMENITE
+// DLSS5 Feeder: only without Launchpad's and Lumenite's, from Direct3D 10 on (DLSS5_Motion.fx needs it too).
+#define UPLIFT_DLSS5 0
+#if !UPLIFT_LAUNCHPAD && !UPLIFT_LUMENITE && UPLIFT_USE_DLSS5 && __RENDERER__ >= 0xa000
+  #undef UPLIFT_DLSS5
+  #define UPLIFT_DLSS5 1
+#endif
+
+#if UPLIFT_LAUNCHPAD || UPLIFT_LUMENITE || UPLIFT_DLSS5
 texture UPLIFT_MV { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RG16F; };
 
 void UpliftMotionVS(uint id : SV_VertexID, out float4 position : SV_Position, out float2 texcoord : TEXCOORD) {
@@ -72,6 +88,17 @@ void UpliftMotionVS(uint id : SV_VertexID, out float4 position : SV_Position, ou
 float2 UpliftMotionPS(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target {
   if (!UpliftAllowLaunchpad) return 0.0;
   return Deferred::get_motion(texcoord) * float2(BUFFER_WIDTH, BUFFER_HEIGHT);
+}
+#endif
+
+#if UPLIFT_DLSS5
+// DLSS5_Motion's output, declared as that effect declares it, so ReShade gives this file the same texture: a UV offset from this frame to
+// the previous one, as Launchpad's. DLSS5_Motion writes it; this file only reads it.
+texture DLSS5_MotionVectors { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RG16F; };
+sampler2D UpliftDlss5Motion { Texture = DLSS5_MotionVectors; MagFilter = POINT; MinFilter = POINT; MipFilter = POINT; AddressU = CLAMP; AddressV = CLAMP; };
+float2 UpliftDlss5MotionPS(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target {
+  if (!UpliftAllowDlss5) return 0.0;
+  return tex2Dlod(UpliftDlss5Motion, float4(texcoord, 0.0, 0.0)).xy * float2(BUFFER_WIDTH, BUFFER_HEIGHT);
 }
 #endif
 
@@ -161,6 +188,8 @@ technique Uplift <
   uplift_motion_source = 1;
 #elif UPLIFT_LUMENITE
   uplift_motion_source = 2;
+#elif UPLIFT_DLSS5
+  uplift_motion_source = 3;
 #else
   uplift_motion_source = 0;
 #endif
@@ -183,6 +212,14 @@ technique Uplift <
   {
     VertexShader = UpliftMotionVS;
     PixelShader = UpliftLumeniteMotionPS;
+    RenderTarget = UPLIFT_MV;
+  }
+#endif
+#if UPLIFT_DLSS5
+  pass Motion
+  {
+    VertexShader = UpliftMotionVS;
+    PixelShader = UpliftDlss5MotionPS;
     RenderTarget = UPLIFT_MV;
   }
 #endif

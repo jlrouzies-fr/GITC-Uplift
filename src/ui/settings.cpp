@@ -155,6 +155,7 @@ MotionPick MotionPickOf(const Settings& settings) {
   switch (settings.motion_vectors) {
     case MotionVectorSource::LAUNCHPAD: return MotionPick::LAUNCHPAD;
     case MotionVectorSource::LUMENITE:  return MotionPick::LUMENITE;
+    case MotionVectorSource::DLSS5:     return MotionPick::DLSS5;
     case MotionVectorSource::NONE:      return MotionPick::OFF;
     case MotionVectorSource::AUTO:
     case MotionVectorSource::DLSS:      break;
@@ -168,6 +169,7 @@ void SetMotionPick(Settings* settings, MotionPick pick) {
     case MotionPick::DLSS:      settings->motion_vectors = MotionVectorSource::AUTO; break;
     case MotionPick::LAUNCHPAD: settings->motion_vectors = MotionVectorSource::LAUNCHPAD; break;
     case MotionPick::LUMENITE:  settings->motion_vectors = MotionVectorSource::LUMENITE; break;
+    case MotionPick::DLSS5:     settings->motion_vectors = MotionVectorSource::DLSS5; break;
   }
 }
 

@@ -544,18 +544,19 @@ bool DrawPassStageRow(const SettingDescriptor& descriptor, const OverlayView& vi
   return changed;
 }
 
-// The Motion vectors row -- Off / DLSS / Launchpad / Lumenite -- from Setup, as the NR stage row.
+// The Motion vectors row -- Off / DLSS / Launchpad / Lumenite / DLSS5 Feeder -- from Setup, as the NR stage row.
 bool DrawMotionRow(const OverlayView& view, Settings* settings, OverlayState* state) {
   gui::PushID("MotionVectors");
-  static constexpr std::array<const char*, 4> OPTIONS = {"Off", "DLSS", "Launchpad", "Lumenite"};
-  std::array<std::string_view, 4> tips = {
+  static constexpr std::array<const char*, 5> OPTIONS = {"Off", "DLSS", "Launchpad", "Lumenite", "DLSS5 Feeder"};
+  std::array<std::string_view, 5> tips = {
       "No motion vectors, anywhere.",
       "The game's own DLSS motion vectors: bound directly inside the frame, and copied for Present when "
       "NR stage is Present.",
       "iMMERSE Launchpad on, and Uplift.fx's Uplift technique below it. The presented image only.",
       "LumeniteFX's Kernel on, and Uplift.fx's Uplift technique below it. The presented image only. Auto uses Launchpad when both are on.",
+      "DLSS 5 Feeder's DLSS5_Motion on, and Uplift.fx's Uplift technique below it. The presented image only. Never chosen by Auto.",
   };
-  std::array<std::string_view, 4> why = {};
+  std::array<std::string_view, 5> why = {};
   for (size_t index = 0u; index < why.size(); ++index) {
     why[index] = view.setup.motion_options[index].why;
   }
@@ -755,7 +756,7 @@ void DrawDetails(const OverlayView& view, const Settings& settings, OverlayState
         switch (group.motion) {
           case sources::MotionSource::DIRECT: motion = "DLSS"; break;
           case sources::MotionSource::PRESENT_COPY: motion = "DLSS copy"; break;
-          case sources::MotionSource::LAUNCHPAD: motion = view.lumenite_motion ? "Lumenite" : "Launchpad"; break;
+          case sources::MotionSource::LAUNCHPAD: motion = view.dlss5_motion ? "DLSS5 Feeder" : view.lumenite_motion ? "Lumenite" : "Launchpad"; break;
           default: break;
         }
         gui::TableNextRow();

@@ -35,7 +35,9 @@ void FillStageAndMotion(ui::SetupFacts* facts, Placement placement, sources::Mot
       facts->motion_copied = true;
       break;
     case sources::MotionSource::LAUNCHPAD:  // UPLIFT_MV: Launchpad's, or Lumenite's while Uplift.fx is compiled for it
-      facts->motion = (facts->uplift_mv_lumenite ? ui::MotionPick::LUMENITE : ui::MotionPick::LAUNCHPAD);
+      facts->motion = (facts->uplift_mv_dlss5      ? ui::MotionPick::DLSS5
+                       : facts->uplift_mv_lumenite ? ui::MotionPick::LUMENITE
+                                                   : ui::MotionPick::LAUNCHPAD);
       break;
   }
 }

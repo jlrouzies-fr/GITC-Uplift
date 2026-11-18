@@ -1108,6 +1108,7 @@ ContextStatus DeviceContext::Status() const {
         reason = "set to Off";
       } else if (!settings_.motion_vectors) {
         reason = (placement_.placement == Placement::PRESENT ? NoUpliftMvReason(facts_)
+                                                              : facts_.uplift_mv_dlss5 ? "DLSS5 Feeder works on the presented image only"
                                                               : (facts_.uplift_mv_lumenite ? "Lumenite works on the presented image only"
                                                                                             : "Launchpad works on the presented image only"));
       } else if (placement_.placement == Placement::PRESENT) {
